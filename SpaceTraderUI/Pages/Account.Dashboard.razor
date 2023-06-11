@@ -1,0 +1,72 @@
+@page "/account/{AccountId}"
+@inject AccountService AccountService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+@if (Account != null)
+{
+    <MudText>Current Agent: @Account.Agent.Symbol</MudText>
+
+    @if (Account.Ships.Count > 0)
+    {
+        <MudTable T="Ship" Items="@Account.Ships">
+            <HeaderContent>
+                <MudTh>Name</MudTh>
+                <MudTh>Type</MudTh>
+                <MudTh>Destination</MudTh>
+                <MudTh>Action</MudTh>
+                <MudTh>Fuel</MudTh>
+                <MudTh></MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Name">@context.Symbol</MudTd>
+                <MudTd DataLabel="Type">@context.Frame.Name</MudTd>
+                <MudTd DataLabel="Destination">@context.Nav.Route.Destination.Symbol</MudTd>
+                <MudTd DataLabel="Action">@context.Nav.Status.ToLower()</MudTd>
+                @{
+                    double fuelRemaining = context.Fuel.Current / context.Fuel.Capacity * 100;
+                }
+                <MudTd DataLabel="Fuel">@fuelRemaining%</MudTd>
+                <MudTd>
+                    <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="@(()=>ShowShipDetail(context.Symbol))">
+                        @((ShowDetails[context.Symbol])? "Hide" : "Show") Details
+                    </MudButton>
+                </MudTd>
+            </RowTemplate>
+            <ChildRowContent>
+                @if (ShowDetails[context.Symbol])
+                {
+                    <MudText>Detail for @context.Symbol</MudText>
+                }
+            </ChildRowContent>
+        </MudTable>
+    }
+}
+
+@code
+{
+    [Parameter]
+    public string AccountId { get; set; } = String.Empty;
+
+    protected Account? Account;
+
+    private Dictionary<string, bool> ShowDetails = new();
+
+    protected override void OnInitialized()
+    {
+        Account = AccountService.GetByAccountId(AccountId);
+        if (Account == null) 
+        {
+            Snackbar.Add("No Agent Found");
+            Navigation.NavigateTo("/acounts");
+        }
+
+        ShowDetails = Account!.Ships.Select((s) => new KeyValuePair<string, bool>(s.Symbol, false)).ToDictionary(kv =>kv.Key, kv=>kv.Value);
+        StateHasChanged();
+    }
+
+    protected void ShowShipDetail(string symbol)
+    {
+        ShowDetails[symbol] = !ShowDetails[symbol];
+    }
+}

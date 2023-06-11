@@ -1,7 +1,36 @@
 ﻿@page "/"
+@using System.Net.Http.Headers;
+@using System.Text
+@using System.Text.Json
+@inject HttpClient _httpClient
 
 <PageTitle>Index</PageTitle>
 
-<MudText Typo="Typo.h3" GutterBottom="true">Hello, world!</MudText>
-<MudText Class="mb-8">Welcome to your new app, powered by MudBlazor!</MudText>
-<MudAlert Severity="Severity.Normal">You can find documentation and examples on our website here: <MudLink Href="https://mudblazor.com" Typo="Typo.body2" Color="Color.Inherit"><b>www.mudblazor.com</b></MudLink></MudAlert>
+<MudText Typo="Typo.h3" GutterBottom="true">@debug</MudText>
+
+@code {
+
+    string debug = String.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, SpaceTraderAPI.RegistAgent);
+
+        object obj = new
+        {
+            Symbol = "asdasdasdasdas",
+            Faction = "COSMIC",
+        };
+
+        request.Content = new StringContent(JsonSerializer.Serialize<object>(obj, new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            WriteIndented = true
+        }), Encoding.UTF8, new MediaTypeHeaderValue("application/json"));
+
+        using (var response = await _httpClient.SendAsync(request).ConfigureAwait(false))
+        {
+            debug = await response.Content.ReadAsStringAsync();
+        }
+    }
+}

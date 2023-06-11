@@ -1,0 +1,196 @@
+@page "/Accounts"
+@using System.Net.Http.Headers
+@using System.Text
+@using System.Text.Json
+
+@inject HttpClient HttpClient
+@inject IDialogService DialogService
+@inject AccountService AccountService
+@inject FactionService FactionService
+@inject NavigationManager Navigation
+
+<MudGrid>
+    <MudItem xs="12" md="12" lg="12">
+        <MudButton Tag="@Action.NewAgent" Variant="Variant.Filled" Color="Color.Primary"
+            OnClick="@(e => OpenDialog(Action.NewAgent))">@Action.NewAgent</MudButton>
+        <MudButton Tag="@Action.LoadAgent" Variant="Variant.Filled" Color="Color.Primary"
+            OnClick="@(e => OpenDialog(Action.LoadAgent))">@Action.LoadAgent</MudButton>
+    </MudItem>
+    @if (AccountService.Accounts.Count() > 0)
+    {
+        <MudItem>
+            <MudTable Items="@AccountService.Accounts">
+                <HeaderContent>
+                    <MudTh>Name</MudTh>
+                    <MudTh>Faction</MudTh>
+                    <MudTh>Headquarter</MudTh>
+                    <MudTh>Credits</MudTh>
+                    <MudTh># of Ships</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Name">
+                        <MudNavLink Href="@($"account/{context.Agent.AccountId}")" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.StayPrimaryPortrait">@context.Agent.Symbol</MudNavLink>
+                    </MudTd>
+                    <MudTd DataLabel="Faction">@context.Faction.Name</MudTd>
+                    <MudTd DataLabel="Headquarter">@context.Agent.Headquarters</MudTd>
+                    <MudTd DataLabel="Credits">@context.Agent.Credits</MudTd>
+                    <MudTd DataLabel="# of Ships">@context.Ships.Count</MudTd>
+                </RowTemplate>
+            </MudTable>
+        </MudItem>
+    }
+</MudGrid>
+
+<MudDialog @bind-IsVisible="DialogVisible" Options="@DialogOptions">
+    <TitleContent>
+        @CurrentAction
+    </TitleContent>
+    <DialogContent>
+        @switch (CurrentAction)
+        {
+        case Action.NewAgent:
+            <MudTextField T="string" Value="@InputValue" Label="@CurrentAction"
+                HelperText="Note: A new agent must be less than 13 characters" Pattern="^[a-zA-Z0-9]{3,12}$" Required="true"
+                Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Shuffle" OnAdornmentClick="() => InputValue = Util.RandomString(12)"
+                RequiredError="Input is required!" Error="@(!String.IsNullOrEmpty(ErrorMessage))"
+                ErrorText="@ErrorMessage" />
+            <MudSelect T="Faction" Value="@InputFaction" 
+                       Label="Select Faction" AnchorOrigin="Origin.BottomCenter"
+                Required="true" RequiredError="Faction is required">
+                @foreach (var faction in FactionService.Factions!)
+                {
+                    <MudSelectItem Value="@faction">@faction.Name</MudSelectItem>
+                }
+            </MudSelect>
+
+            @if (InputFaction != null)
+            {
+                <div class="d-flex mud-width-full align-center mt-8">
+                    <MudText Typo="Typo.subtitle1" Class="mr-2">Faction Traits: </MudText>
+                    @foreach (var trait in InputFaction.Traits)
+                    {
+                        @* <MudTooltip Text="@trait.Description"> *@
+                            <MudChip>@trait.Name</MudChip>
+                        @* </MudTooltip> *@
+                    }
+                </div>
+            }
+            break;
+        case Action.LoadAgent:
+            <MudTextField T="string"Value="@InputValue" Label="@CurrentAction" HelperText="Bearer Token"
+                Required="true" RequiredError="Input is required!" Error="@(!String.IsNullOrEmpty(ErrorMessage))"
+                ErrorText="@ErrorMessage" />
+            break;
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => DialogVisible = false">Cancel</MudButton>
+        @switch (CurrentAction)
+        {
+            case Action.NewAgent:
+                <MudButton Color="Color.Primary" OnClick="NewAgentSubmit">Ok</MudButton>
+                break;
+            case Action.LoadAgent:
+                <MudButton Color="Color.Primary" OnClick="LoadAgentSubmit">Ok</MudButton>
+                break;
+        }
+    </DialogActions>
+</MudDialog>
+
+
+
+@code
+{
+    private record Action
+    {
+        public const string NewAgent = "New Agent";
+        public const string LoadAgent = "Load Agent";
+    }
+
+    protected async override void OnInitialized()
+    {
+        // load factions, if null
+        if (FactionService.Factions == null)
+        {
+            HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, SpaceTraderAPI.Factions);
+            using (var response = await HttpClient.SendAsync(request).ConfigureAwait(false))
+            using (var responseStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false))
+            {
+                HttpResponseWrapper<List<Faction>> wrapper = JsonSerializer.Deserialize<HttpResponseWrapper<List<Faction>>>(responseStream)!;
+                FactionService.Factions = wrapper.Data!;
+            }
+        }
+    }
+
+
+    // property for dialog
+    private bool DialogVisible;
+    private DialogOptions DialogOptions = new() { CloseOnEscapeKey = true, FullWidth = true };
+    private void OpenDialog(string action)
+    {
+        if (action != CurrentAction)
+        {
+            InputValue = String.Empty;
+            InputFaction = FactionService.Factions![0];
+        }
+        CurrentAction = action;
+        DialogVisible = true;
+    }
+
+    protected async void NewAgentSubmit()
+    {
+        HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, SpaceTraderAPI.RegistAgent);
+        object content = new
+        {
+            Symbol = InputValue,
+            Faction = InputFaction!.Symbol,
+        };
+        request.Content = new StringContent(JsonSerializer.Serialize<object>(content, new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                WriteIndented = true
+            }), Encoding.UTF8, new MediaTypeHeaderValue("application/json"));
+
+        using (var response = await HttpClient.SendAsync(request).ConfigureAwait(false))
+        using (var responseStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false))
+        {
+            HttpResponseWrapper<Account> wrapper = JsonSerializer.Deserialize<HttpResponseWrapper<Account>>(responseStream)!;
+            AccountService.AddAccount(wrapper.Data!);
+        }
+
+        InputValue = String.Empty;
+        InputFaction = FactionService.Factions![0];
+        DialogVisible = false;
+        StateHasChanged();
+    }
+    protected async void LoadAgentSubmit()
+    {
+        HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, SpaceTraderAPI.MyAgent);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", InputValue);
+
+        using (var response = await HttpClient.SendAsync(request).ConfigureAwait(false))
+        using (var responseStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false))
+        {
+            HttpResponseWrapper<Agent> wrapper = JsonSerializer.Deserialize<HttpResponseWrapper<Agent>>(responseStream)!;
+
+            Account account = new Account()
+                {
+                    Token = InputValue,
+                    Agent = wrapper.Data!,
+                };
+            AccountService.AddAccount(account);
+        }
+        InputValue = String.Empty;
+        InputFaction = FactionService.Factions![0];
+        DialogVisible = false;
+        StateHasChanged();
+    }
+
+    // property used for API request
+    string CurrentAction = String.Empty;
+    string InputValue { get; set; } = String.Empty;
+    Faction? InputFaction { get; set; }
+    // used to display anything error message    
+    string ErrorMessage { get; set; } = String.Empty;
+    @* string DebugMessage { get; set; } = String.Empty; *@
+}

@@ -1,0 +1,8 @@
+public class BearerFixture
+{
+    // public string AgentToken = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZGVudGlmaWVyIjoiREFXTkJSSU5HRVIiLCJ2ZXJzaW9uIjoidjIiLCJyZXNldF9kYXRlIjoiMjAyMy0wNS0yMCIsImlhdCI6MTY4NTA3NTMzMSwic3ViIjoiYWdlbnQtdG9rZW4ifQ.J5ZOOP0sAx727dxFEDg4VW4KxTdrklmPjsZDyLsm6jNiGX96QWrE9KcEouIX9BnQdLJUCaVn3yeHH4l6OoMzN9koIcHp0OLFLYI5UFfZwizM-PhMJqlHHLrsDHhWIRCzBMEUU6yd7T2-6-sLaSPHhd2x776rDfDf1Dmrg182cMv09QRfFScvYw5yN05mEXTl4wfnMu35tT5fIkkkphijSsBIA01L3C07ppDfxCXEz-qfBIUwhSI-zvC-RXAvYbNCxqCSzq1XnyREI35dlD-QJD3YhSAUFqcRfmeJS8plCGtRdUQjdeAvW5IRfPVwUKF7V2lw7mPA_If0xAsAf9wfTg";
+    public string AgentToken = "...";
+}
+
+[CollectionDefinition("bearer")]
+public class BearerCollection : ICollectionFixture<BearerFixture> { }
